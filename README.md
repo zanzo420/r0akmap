@@ -1,3 +1,9 @@
+# r0akmap
+
+r0akmap is a (PoC) driver manual mapper based on r0ak, similar to Turla Driver Loader.
+HVCI must be disabled for this to work.
+Unfortunately due to paging and stuff the loader BSODs about 80% the time.
+
 # r0ak![Downloads](https://img.shields.io/github/downloads/atom/atom/total.svg)
 
 r0ak is a Windows command-line utility that enables you to easily read, write, and execute kernel-mode code (with some limitations) from the command prompt, without requiring anything else other than Administrator privileges.

@@ -74,7 +74,8 @@ _Success_(return != 0)
 PVOID
 SymLookup (
     _In_ PCHAR ModuleName,
-    _In_ PCHAR SymbolName
+    _In_ PCHAR SymbolName,
+	_In_opt_ void(*DoTransforms)(PDWORD64 Address)
     )
 {
     ULONG_PTR offset;
@@ -164,6 +165,8 @@ SymLookup (
     //
     // Compute the offset based on the mapped address
     //
+	if (DoTransforms)
+		DoTransforms(&symbol->Address);
     offset = symbol->Address - kernelBase;
     FreeLibrary((HMODULE)kernelBase);
     pSymUnloadModule64(GetCurrentProcess(), imageBase);
@@ -173,6 +176,15 @@ SymLookup (
     // Compute the final location based on the real kernel base
     //
     return (PVOID)(realKernelBase + offset);
+}
+
+static
+void
+SepHSTIResultsSizeFindHelper(
+	PDWORD64 Address
+)
+{
+	*Address = *Address + 12 + *(LONG*)(*Address + 8);
 }
 
 _Success_(return != 0)
@@ -189,62 +201,67 @@ SymSetup (
     ULONG type;
     BOOL b;
 
-    //
-    // Open the Kits key
-    //
-    dwError = RegOpenKey(HKEY_LOCAL_MACHINE,
-                         L"Software\\Microsoft\\Windows Kits\\Installed Roots",
-                         &rootKey);
-    if (dwError != ERROR_SUCCESS)
-    {
-        printf("[-] No Windows SDK or WDK installed: %lx\n", dwError);
-        return FALSE;
-    }
+	// i just prefer to toss it next to the executable
+	hMod = LoadLibraryA("dbghelp.dll");
+	if (!hMod)
+	{
+		//
+		// Open the Kits key
+		//
+		dwError = RegOpenKey(HKEY_LOCAL_MACHINE,
+			L"Software\\Microsoft\\Windows Kits\\Installed Roots",
+			&rootKey);
+		if (dwError != ERROR_SUCCESS)
+		{
+			printf("[-] No Windows SDK or WDK installed: %lx\n", dwError);
+			return FALSE;
+		}
 
-    //
-    // Check where a kit was installed
-    //
-    pathSize = sizeof(rootPath);
-    type = REG_SZ;
-    dwError = RegQueryValueEx(rootKey,
-                              L"KitsRoot10",
-                              NULL,
-                              &type,
-                              (LPBYTE)rootPath,
-                              &pathSize);
-    if (dwError != ERROR_SUCCESS)
-    {
-        printf("[-] Win 10 SDK/WDK not found, falling back to 8.1: %lx\n",
-               dwError);
-        dwError = RegQueryValueEx(rootKey,
-                                  L"KitsRoot81",
-                                  NULL,
-                                  &type,
-                                  (LPBYTE)rootPath,
-                                  &pathSize);
-        if (dwError != ERROR_SUCCESS)
-        {
-            printf("[-] Win 8.1 SDK/WDK not found, falling back to 8: %lx\n",
-                   dwError);
-            dwError = RegQueryValueEx(rootKey,
-                                      L"KitsRoot8",
-                                      NULL,
-                                      &type,
-                                      (LPBYTE)rootPath,
-                                      &pathSize);
-            if (dwError != ERROR_SUCCESS)
-            {
-                printf("[-] Win 8 SDK/WDK not found %lx\n", dwError);
-                return FALSE;
-            }
-        }
-    }
+		//
+		// Check where a kit was installed
+		//
+		pathSize = sizeof(rootPath);
+		type = REG_SZ;
+		dwError = RegQueryValueEx(rootKey,
+			L"KitsRoot10",
+			NULL,
+			&type,
+			(LPBYTE)rootPath,
+			&pathSize);
+		if (dwError != ERROR_SUCCESS)
+		{
+			printf("[-] Win 10 SDK/WDK not found, falling back to 8.1: %lx\n",
+				dwError);
+			dwError = RegQueryValueEx(rootKey,
+				L"KitsRoot81",
+				NULL,
+				&type,
+				(LPBYTE)rootPath,
+				&pathSize);
+			if (dwError != ERROR_SUCCESS)
+			{
+				printf("[-] Win 8.1 SDK/WDK not found, falling back to 8: %lx\n",
+					dwError);
+				dwError = RegQueryValueEx(rootKey,
+					L"KitsRoot8",
+					NULL,
+					&type,
+					(LPBYTE)rootPath,
+					&pathSize);
+				if (dwError != ERROR_SUCCESS)
+				{
+					printf("[-] Win 8 SDK/WDK not found %lx\n", dwError);
+					return FALSE;
+				}
+			}
+		}
 
-    //
-    // Now try to load the correct debug help library
-    //
-    wcscat_s(rootPath, _ARRAYSIZE(rootPath), L"debuggers\\x64\\dbghelp.dll");
-    hMod = LoadLibrary(rootPath);
+		//
+		// Now try to load the correct debug help library
+		//
+		wcscat_s(rootPath, _ARRAYSIZE(rootPath), L"debuggers\\x64\\dbghelp.dll");
+		hMod = LoadLibrary(rootPath);
+	}
     if (hMod == NULL)
     {
         printf("[-] Failed to load Debugging Tools Dbghelp.dll: %lx\n",
@@ -306,25 +323,26 @@ SymSetup (
     //
     // Initialize our gadgets
     //
-    g_XmFunction = SymLookup("hal.dll", "XmMovOp");
+    g_XmFunction = SymLookup("hal.dll", "XmMovOp", NULL);
     if (g_XmFunction == NULL)
     {
         printf("[-] Failed to find hal!XmMovOp\n");
         return FALSE;
     }
-    g_HstiBufferSize = SymLookup("ntoskrnl.exe", "SepHSTIResultsSize");
+    g_HstiBufferSize = SymLookup("ntoskrnl.exe", "SeQueryHSTIResults", &SepHSTIResultsSizeFindHelper);
     if (g_HstiBufferSize == NULL)
     {
-        printf("[-] Failed to find nt!SepHSTIResultsSize\n");
+        printf("[-] Failed to find nt!SeQueryHSTIResults\n");
         return FALSE;
     }
-    g_HstiBufferPointer = SymLookup("ntoskrnl.exe", "SepHSTIResultsBuffer");
+	g_HstiBufferPointer = (PVOID)((ULONG_PTR)g_HstiBufferSize + 8);
+	/*g_HstiBufferPointer = SymLookup("ntoskrnl.exe", "SepHSTIResultsBuffer", NULL);
     if (g_HstiBufferPointer == NULL)
     {
         printf("[-] Failed to find nt!SepHSTIResultsBuffer\n");
         return FALSE;
-    }
-    g_TrampolineFunction = SymLookup("ntoskrnl.exe", "PopFanIrpComplete");
+    }*/
+    g_TrampolineFunction = SymLookup("ntoskrnl.exe", "PopFanIrpComplete", NULL);
     if (g_TrampolineFunction == NULL)
     {
         printf("[-] Failed to find nt!PopFanIrpComplete\n");

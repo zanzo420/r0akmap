@@ -53,10 +53,11 @@ typedef struct _ETW_DATA *PETW_DATA;
 //
 _Success_(return != 0)
 PVOID
-SymLookup (
-    _In_ PCHAR ModuleName,
-    _In_ PCHAR SymbolName
-    );
+SymLookup(
+	_In_ PCHAR ModuleName,
+	_In_ PCHAR SymbolName,
+	_In_opt_ void(*DoTransforms)(PDWORD64 Address)
+);
 
 _Success_(return != 0)
 BOOL

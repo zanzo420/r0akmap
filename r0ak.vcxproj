@@ -7,12 +7,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="mapper.cpp" />
     <ClCompile Include="r0aketw.c" />
     <ClCompile Include="r0akexec.c" />
+    <ClCompile Include="r0akmap.cpp" />
     <ClCompile Include="r0akmem.c" />
-    <ClCompile Include="r0ak.c">
-      <PrecompiledHeader>Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="r0akrd.c" />
     <ClCompile Include="r0akrun.c" />
     <ClCompile Include="r0aksym.c" />
@@ -20,6 +19,7 @@
     <ClCompile Include="r0akwr.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="page_stuff.hpp" />
     <ClInclude Include="r0ak.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -48,13 +48,14 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>r0ak.h</PrecompiledHeaderFile>
       <Optimization>Full</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
+      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</TreatWarningAsError>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
