@@ -211,7 +211,7 @@ void* MmGetVirtualForPhysical(uintptr_t rcx)
 		SymLookup("ntoskrnl.exe", "MmGetVirtualForPhysical", [](PDWORD64 Address)
 		{
 			g_MmGetVirtualForPhysical_constant0 = *offset_ptr<uintptr_t*>(*Address, 0x10);
-			g_MmGetVirtualForPhysical_constant0 = *offset_ptr<uintptr_t*>(*Address, 0x22);
+			g_MmGetVirtualForPhysical_constant1 = *offset_ptr<uintptr_t*>(*Address, 0x22);
 		});
 	}
 	auto rax = rcx;
